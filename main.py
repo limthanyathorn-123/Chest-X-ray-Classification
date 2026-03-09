@@ -44,11 +44,11 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # -----------------------------
 # Config
 # -----------------------------
-CLASSES_14 = [
+CLASSES_15 = [
     "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration",
     "Mass", "Nodule", "Pneumonia", "Pneumothorax",
     "Consolidation", "Edema", "Emphysema", "Fibrosis",
-    "Pleural_Thickening", "Hernia",
+    "Pleural_Thickening", "Hernia", "None"
 ]
 SEED = 42
 
@@ -131,11 +131,11 @@ def _is_numeric_token(tok: str) -> bool:
 def parse_list_line(line: str, class_to_idx: Dict[str, int]) -> Optional[Tuple[str, np.ndarray]]:
     """
     Supports:
-      1) img.png 0 1 0 ... (14 nums)
+      1) img.png 0 1 0 ... ( nums)
       2) img.png Atelectasis|Effusion
       3) img.png "Atelectasis|Effusion"
       4) img.png, Atelectasis|Effusion
-    Returns (img_name_or_path, multi_hot[14]) or None.
+    Returns (img_name_or_path, multi_hot[15]) or None.
     """
     line = line.strip()
     if not line:
@@ -153,15 +153,15 @@ def parse_list_line(line: str, class_to_idx: Dict[str, int]) -> Optional[Tuple[s
             nums = []
             break
 
-    if len(nums) >= len(CLASSES_14):
-        vec = np.array(nums[:len(CLASSES_14)], dtype=np.float32)
+    if len(nums) >= len(CLASSES_15):
+        vec = np.array(nums[:len(CLASSES_15)], dtype=np.float32)
         vec = (vec > 0.5).astype(np.float32)
         return img, vec
 
     # Case B: string labels
     label_str = " ".join(parts[1:]).strip().strip('"').strip("'").strip()
     if not label_str:
-        return img, np.zeros(len(CLASSES_14), dtype=np.float32)
+        return img, np.zeros(len(CLASSES_15), dtype=np.float32)
 
     if label_str.startswith(","):
         label_str = label_str[1:].strip()
@@ -169,7 +169,7 @@ def parse_list_line(line: str, class_to_idx: Dict[str, int]) -> Optional[Tuple[s
     raw_labels = re.split(r"[|,;]+", label_str)
     raw_labels = [x.strip() for x in raw_labels if x.strip()]
 
-    vec = np.zeros(len(CLASSES_14), dtype=np.float32)
+    vec = np.zeros(len(CLASSES_15), dtype=np.float32)
     for lab in raw_labels:
         if lab.lower() in ["no finding", "nofinding", "normal"]:
             continue
@@ -183,7 +183,7 @@ def parse_list_line(line: str, class_to_idx: Dict[str, int]) -> Optional[Tuple[s
 
 
 def load_list(list_path: str) -> List[Tuple[str, np.ndarray]]:
-    class_to_idx = {c: i for i, c in enumerate(CLASSES_14)}
+    class_to_idx = {c: i for i, c in enumerate(CLASSES_15)}
     items: List[Tuple[str, np.ndarray]] = []
     with open(list_path, "r") as f:
         for line in f:
@@ -282,7 +282,7 @@ def compute_auc_roc(y_true: np.ndarray, y_prob: np.ndarray):
     curves = {}
     per_class_auc = {}
 
-    for i, cls in enumerate(CLASSES_14):
+    for i, cls in enumerate(CLASSES_15):
         yt = y_true[:, i]
         yp = y_prob[:, i]
 
@@ -315,7 +315,7 @@ def compute_auc_roc(y_true: np.ndarray, y_prob: np.ndarray):
     macro_auc = float(np.mean(aucs)) if len(aucs) else float("nan")
 
     # macro ROC curve
-    valid = [(cls, curves[cls]) for cls in CLASSES_14 if cls in curves]
+    valid = [(cls, curves[cls]) for cls in CLASSES_15 if cls in curves]
     macro_curve = None
     if len(valid) > 0:
         all_fpr = np.unique(np.concatenate([c[0] for _, c in valid]))
@@ -333,7 +333,7 @@ def compute_auc_roc(y_true: np.ndarray, y_prob: np.ndarray):
 def plot_roc(curves, per_class_auc, micro_auc, macro_auc, out_path, title="ChestXray14 ROC Curves"):
     plt.figure(figsize=(10, 8))
 
-    for cls in CLASSES_14:
+    for cls in CLASSES_15:
         if cls in curves:
             fpr, tpr = curves[cls]
             plt.plot(fpr, tpr, label=f"{cls} (AUC={per_class_auc[cls]:.3f})")
@@ -400,10 +400,10 @@ def save_one_example_per_class(items: List[Tuple[str, np.ndarray]], data_dir: st
     Saves 1 raw image per class where that class is actually positive.
     """
     os.makedirs(out_dir, exist_ok=True)
-    picked = {c: None for c in CLASSES_14}
+    picked = {c: None for c in CLASSES_15}
 
     for img_name, y in items:
-        for i, cls in enumerate(CLASSES_14):
+        for i, cls in enumerate(CLASSES_15):
             if picked[cls] is None and y[i] > 0.5:
                 picked[cls] = img_name
         if all(v is not None for v in picked.values()):
@@ -438,7 +438,7 @@ def save_pred_vs_actual_per_class(
     os.makedirs(out_dir, exist_ok=True)
 
     name_to_idx = {names[i]: i for i in range(len(names))}
-    saved = {c: False for c in CLASSES_14}
+    saved = {c: False for c in CLASSES_15}
 
     for img_name, y in test_items:
         base = os.path.basename(img_name)
@@ -448,11 +448,11 @@ def save_pred_vs_actual_per_class(
         yt = y_true[i]
         yp = y_prob[i]
 
-        actual_pos = [CLASSES_14[k] for k in range(len(CLASSES_14)) if yt[k] > 0.5]
+        actual_pos = [CLASSES_15[k] for k in range(len(CLASSES_15)) if yt[k] > 0.5]
         topk = np.argsort(-yp)[:3]
-        topk_str = ", ".join([f"{CLASSES_14[k]}:{yp[k]:.2f}" for k in topk])
+        topk_str = ", ".join([f"{CLASSES_15[k]}:{yp[k]:.2f}" for k in topk])
 
-        for ci, cls in enumerate(CLASSES_14):
+        for ci, cls in enumerate(CLASSES_15):
             if saved[cls]:
                 continue
             if yt[ci] < 0.5:
@@ -561,7 +561,7 @@ def main(args: Args):
         persistent_workers=True, prefetch_factor=4
     )
 
-    model = build_model(len(CLASSES_14)).to(device)
+    model = build_model(len(CLASSES_15)).to(device)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -641,7 +641,7 @@ def main(args: Args):
     print(f"train_macro_auc: {macro_auc_tr}")
 
     print("\n=== Test AUC ===")
-    for c in CLASSES_14:
+    for c in CLASSES_15:
         print(f"{c:18s}: {per_auc_te[c]}")
     print(f"test_micro_auc: {micro_auc_te}")
     print(f"test_macro_auc: {macro_auc_te}")
@@ -675,4 +675,5 @@ if __name__ == "__main__":
         num_workers=8,
     )
     print(args)
+
     main(args)
